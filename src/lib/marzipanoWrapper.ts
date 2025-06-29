@@ -1,4 +1,5 @@
 // Wrapper for Marzipano to handle initialization and scene management
+import { SceneData } from '@/types/scenes';
 
 interface ViewerOptions {
   mouseViewMode?: string;
@@ -7,34 +8,6 @@ interface ViewerOptions {
     [key: string]: any;
   };
   [key: string]: any;
-}
-
-interface SceneData {
-  id: string;
-  name: string;
-  floor: number;
-  position: {
-    x: number;
-    y: number;
-    z: number;
-  };
-  levels?: Array<{ width: number }>;
-  faceSize?: number;
-  initialViewParameters?: {
-    yaw: number;
-    pitch: number;
-    fov: number;
-  };
-  linkHotspots?: Array<{
-    yaw: number;
-    pitch: number;
-    target: string;
-    distance?: number;
-  }>;
-  panoPos?: {
-    x: number;
-    y: number;
-  };
 }
 
 export class MarzipanoWrapper {

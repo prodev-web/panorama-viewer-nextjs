@@ -3,17 +3,11 @@
 import { useEffect, useRef } from "react";
 import { createRoot, Root } from "react-dom/client";
 import styles from "./Hotspot.module.css";
-
-interface HotspotData {
-  target: string;
-  distance?: number;
-  yaw: number;
-  pitch: number;
-}
+import { LinkHotspot } from "@/types/scenes";
 
 interface HotspotProps {
   element: HTMLElement;
-  data: HotspotData;
+  data: LinkHotspot;
   visible: boolean;
   onNavigate: (sceneId: string) => void;
 }

@@ -1,3 +1,5 @@
+import { Position, PanoPosition } from '@/types/scenes';
+
 // Check WebGL support
 export function checkWebGLSupport(): boolean {
   try {
@@ -31,7 +33,7 @@ export function createRipple(x: number, y: number): void {
 }
 
 // Calculate distance between two positions
-export function calculateDistance(pos1: { x: number; y: number }, pos2: { x: number; y: number }): number {
+export function calculateDistance(pos1: Position | PanoPosition, pos2: Position | PanoPosition): number {
   return Math.sqrt(
     Math.pow(pos1.x - pos2.x, 2) + 
     Math.pow(pos1.y - pos2.y, 2)

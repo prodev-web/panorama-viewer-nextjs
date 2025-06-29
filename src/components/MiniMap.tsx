@@ -2,36 +2,7 @@
 
 import { useEffect, useRef, ReactElement } from 'react'
 import styles from './MiniMap.module.css'
-
-interface Position {
-  x: number
-  y: number
-  z: number
-}
-
-interface LinkHotspot {
-  target: string
-  yaw: number
-  pitch: number
-  distance?: number
-}
-
-interface SceneData {
-  id: string
-  name: string
-  floor: number
-  position: Position
-  linkHotspots: LinkHotspot[]
-  initialViewParameters?: {
-    yaw: number
-    pitch: number
-    fov: number
-  }
-  panoPos?: {
-    x: number
-    y: number
-  }
-}
+import { SceneData } from '@/types/scenes'
 
 interface MiniMapProps {
   scenes: SceneData[]

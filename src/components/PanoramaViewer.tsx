@@ -9,44 +9,9 @@ import LoadingScreen from "./LoadingScreen";
 import TransitionOverlay from "./TransitionOverlay";
 import Hotspot from "./Hotspot";
 import { checkWebGLSupport, createRipple } from "@/lib/panoramaUtils";
+import { SceneData, ConfigData, SceneInfo as SceneInfoType, LinkHotspot } from "@/types/scenes";
 
-// Define types for our application
-interface SceneData {
-  id: string;
-  name: string;
-  floor: number;
-  initialViewParameters: {
-    yaw: number;
-    pitch: number;
-    fov: number;
-  };
-  linkHotspots: Array<{
-    yaw: number;
-    pitch: number;
-    target: string;
-    distance?: number;
-  }>;
-  position: {
-    x: number;
-    y: number;
-    z: number;
-  };
-  panoPos?: {
-    x: number;
-    y: number;
-  };
-}
-
-interface ConfigData {
-  scenes: SceneData[];
-}
-
-interface SceneInfo {
-  data: SceneData;
-  scene: any; // Marzipano scene object
-  hotspotElements: HTMLElement[];
-  loaded: boolean;
-}
+// Using types imported from @/types/scenes.ts
 
 export default function PanoramaViewer() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -58,7 +23,7 @@ export default function PanoramaViewer() {
   const [showTapHint, setShowTapHint] = useState<boolean>(false);
 
   const viewerRef = useRef<any>(null);
-  const scenesRef = useRef<Record<string, SceneInfo>>({});
+  const scenesRef = useRef<Record<string, SceneInfoType>>({});
   const panoRef = useRef<HTMLDivElement>(null);
   const hotspotTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const marzipanoRef = useRef<boolean>(false);
@@ -251,7 +216,7 @@ export default function PanoramaViewer() {
   );
 
   // Clear hotspots for a scene
-  const clearHotspotsForScene = (sceneInfo: SceneInfo): void => {
+  const clearHotspotsForScene = (sceneInfo: SceneInfoType): void => {
     if (!sceneInfo.scene) return;
 
     try {
@@ -272,7 +237,7 @@ export default function PanoramaViewer() {
   };
 
   // Create hotspots for a scene
-  const createHotspotsForScene = (sceneInfo: SceneInfo): void => {
+  const createHotspotsForScene = (sceneInfo: SceneInfoType): void => {
     if (!sceneInfo.scene) return;
 
     try {
@@ -282,7 +247,7 @@ export default function PanoramaViewer() {
       clearHotspotsForScene(sceneInfo);
 
       // Create new hotspots
-      sceneInfo.data.linkHotspots.forEach((hotspotData) => {
+      sceneInfo.data.linkHotspots.forEach((hotspotData: LinkHotspot) => {
         const element = document.createElement("div");
 
         hotspotContainer.createHotspot(element, {
