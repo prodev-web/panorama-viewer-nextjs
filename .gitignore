@@ -46,3 +46,10 @@ __pycache__/
 # IDE
 .vscode/
 .idea/
+
+# Ignore specific files
+pano-poses.csv
+/public/config.json
+
+# Ignore all contents of the /public/images directory
+/public/images/
