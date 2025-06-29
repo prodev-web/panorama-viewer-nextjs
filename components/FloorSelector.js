@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import styles from './FloorSelector.module.css'
 
 export default function FloorSelector({ scenes, currentScene, onFloorChange }) {
@@ -12,12 +12,33 @@ export default function FloorSelector({ scenes, currentScene, onFloorChange }) {
     setFloors(uniqueFloors)
   }, [scenes])
 
-  const handleFloorClick = (floor) => {
-    const scene = scenes.find(s => s.floor === floor)
-    if (scene && scene.id !== currentScene?.id) {
-      onFloorChange(scene.id)
+  const handleFloorClick = useCallback((floor) => {
+    const floorScenes = scenes.filter((s) => s.floor === floor)
+    if (floorScenes.length === 0) return
+
+    if (!currentScene) {
+      onFloorChange(floorScenes[0].id)
+      return
     }
-  }
+
+    // Find closest scene on selected floor to current position
+    let closestScene = floorScenes[0]
+    let minDistance = Infinity
+
+    floorScenes.forEach((scene) => {
+      const dx = scene.position.x - currentScene.position.x
+      const dy = scene.position.y - currentScene.position.y
+      const dz = scene.position.z - currentScene.position.z
+      const distance = Math.sqrt(dx * dx + dy * dy + dz * dz)
+
+      if (distance < minDistance) {
+        minDistance = distance
+        closestScene = scene
+      }
+    })
+
+    onFloorChange(closestScene.id)
+  }, [scenes, currentScene, onFloorChange])
 
   const getFloorLabel = (floor) => {
     if (floor === 0) return 'Ground'
