@@ -4,7 +4,11 @@ import { ReactNode } from 'react';
 export const metadata = {
   title: 'Advanced Panorama Viewer',
   description: 'Interactive 3D panorama tour with floor navigation',
-  viewport: 'width=device-width, initial-scale=1.0',
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1.0,
 };
 
 interface RootLayoutProps {
