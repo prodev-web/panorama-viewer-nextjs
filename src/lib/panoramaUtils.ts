@@ -4,8 +4,9 @@ import { Position, PanoPosition } from '@/types/scenes';
 export function checkWebGLSupport(): boolean {
   try {
     const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl') as WebGLRenderingContext || 
-               canvas.getContext('experimental-webgl') as WebGLRenderingContext;
+    const gl =
+      (canvas.getContext('webgl') as WebGLRenderingContext) ||
+      (canvas.getContext('experimental-webgl') as WebGLRenderingContext);
     if (!gl) {
       return false;
     }
@@ -33,11 +34,11 @@ export function createRipple(x: number, y: number): void {
 }
 
 // Calculate distance between two positions
-export function calculateDistance(pos1: Position | PanoPosition, pos2: Position | PanoPosition): number {
-  return Math.sqrt(
-    Math.pow(pos1.x - pos2.x, 2) + 
-    Math.pow(pos1.y - pos2.y, 2)
-  );
+export function calculateDistance(
+  pos1: Position | PanoPosition,
+  pos2: Position | PanoPosition
+): number {
+  return Math.sqrt(Math.pow(pos1.x - pos2.x, 2) + Math.pow(pos1.y - pos2.y, 2));
 }
 
 // Format floor label

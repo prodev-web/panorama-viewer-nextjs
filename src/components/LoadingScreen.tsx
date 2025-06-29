@@ -1,10 +1,10 @@
-'use client'
+'use client';
 
-import { ReactElement } from 'react'
-import styles from './LoadingScreen.module.css'
+import { ReactElement } from 'react';
+import styles from './LoadingScreen.module.css';
 
 interface LoadingScreenProps {
-  error?: string | null
+  error?: string | null;
 }
 
 export default function LoadingScreen({ error }: LoadingScreenProps): ReactElement {
@@ -14,7 +14,7 @@ export default function LoadingScreen({ error }: LoadingScreenProps): ReactEleme
         <div className={styles.error}>
           <div className={styles.errorTitle}>Failed to initialize panorama viewer</div>
           <div className={styles.errorMessage}>{error}</div>
-          
+
           {error.includes('WebGL') && (
             <div className={styles.helpSection}>
               <div className={styles.helpTitle}>To fix this issue:</div>
@@ -36,7 +36,7 @@ export default function LoadingScreen({ error }: LoadingScreenProps): ReactEleme
           )}
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -44,5 +44,5 @@ export default function LoadingScreen({ error }: LoadingScreenProps): ReactEleme
       <div className={styles.loader}></div>
       <div className={styles.text}>Loading panoramas...</div>
     </div>
-  )
+  );
 }

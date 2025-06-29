@@ -46,17 +46,11 @@ export class MarzipanoWrapper {
     const Marzipano = (window as any).Marzipano;
 
     // Create source
-    const source = Marzipano.ImageUrlSource.fromString(
-      `/images/${sceneData.id}-pano.jpg`
-    );
+    const source = Marzipano.ImageUrlSource.fromString(`/images/${sceneData.id}-pano.jpg`);
 
     // Create geometry
     const geometry = new Marzipano.EquirectGeometry(
-      sceneData.levels || [
-        { width: 1024 },
-        { width: 2048 },
-        { width: 4096 },
-      ]
+      sceneData.levels || [{ width: 1024 }, { width: 2048 }, { width: 4096 }]
     );
 
     // Create view

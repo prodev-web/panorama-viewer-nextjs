@@ -6,10 +6,10 @@ const nextConfig = {
     unoptimized: true, // Since we're using equirectangular images
   },
   // Handle Marzipano's legacy code
-  webpack: (config) => {
+  webpack: config => {
     config.module.rules.push({
       test: /marzipano\.js$/,
-      use: ["script-loader"],
+      use: ['script-loader'],
     });
     return config;
   },

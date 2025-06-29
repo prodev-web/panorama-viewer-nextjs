@@ -1,12 +1,12 @@
-'use client'
+'use client';
 
-import { ReactElement } from 'react'
-import styles from './TransitionOverlay.module.css'
+import { ReactElement } from 'react';
+import styles from './TransitionOverlay.module.css';
 
 interface TransitionOverlayProps {
-  active: boolean
+  active: boolean;
 }
 
 export default function TransitionOverlay({ active }: TransitionOverlayProps): ReactElement {
-  return <div className={`${styles.overlay} ${active ? styles.active : ''}`} />
+  return <div className={`${styles.overlay} ${active ? styles.active : ''}`} />;
 }

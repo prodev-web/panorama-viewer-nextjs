@@ -1,15 +1,15 @@
-"use client";
+'use client';
 
-import { useEffect, useRef } from "react";
-import { createRoot, Root } from "react-dom/client";
-import styles from "./Hotspot.module.css";
-import { LinkHotspot } from "@/types/scenes";
+import { useEffect, useRef } from 'react';
+import { createRoot, Root } from 'react-dom/client';
+import styles from './Hotspot.module.css';
+import { LinkHotspot } from '@/types/scenes';
 
 interface HotspotProps {
   element: HTMLElement;
   data: LinkHotspot;
   visible: boolean;
-  onNavigate: (sceneId: string) => void;
+  onNavigate: (_sceneId: string) => void;
 }
 
 export default function Hotspot({ element, data, visible, onNavigate }: HotspotProps) {
@@ -30,10 +30,7 @@ export default function Hotspot({ element, data, visible, onNavigate }: HotspotP
 
     // Render hotspot content using createRoot
     rootRef.current.render(
-      <div
-        className={`${styles.hotspot} ${visible ? styles.visible : ""}`}
-        onClick={handleClick}
-      >
+      <div className={`${styles.hotspot} ${visible ? styles.visible : ''}`} onClick={handleClick}>
         <div className={styles.arrow}></div>
         <div className={styles.distance}>{data.distance}m</div>
       </div>

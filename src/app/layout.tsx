@@ -1,14 +1,14 @@
-import './globals.css'
-import { ReactNode } from 'react'
+import './globals.css';
+import { ReactNode } from 'react';
 
 export const metadata = {
   title: 'Advanced Panorama Viewer',
   description: 'Interactive 3D panorama tour with floor navigation',
   viewport: 'width=device-width, initial-scale=1.0',
-}
+};
 
 interface RootLayoutProps {
-  children: ReactNode
+  children: ReactNode;
 }
 
 export default function RootLayout({ children }: RootLayoutProps) {
@@ -19,5 +19,5 @@ export default function RootLayout({ children }: RootLayoutProps) {
       </head>
       <body>{children}</body>
     </html>
-  )
+  );
 }

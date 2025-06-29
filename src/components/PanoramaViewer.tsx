@@ -1,15 +1,15 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useRef, useCallback, MouseEvent } from "react";
-import Script from "next/script";
-import FloorSelector from "./FloorSelector";
-import SceneInfo from "./SceneInfo";
-import MiniMap from "./MiniMap";
-import LoadingScreen from "./LoadingScreen";
-import TransitionOverlay from "./TransitionOverlay";
-import Hotspot from "./Hotspot";
-import { checkWebGLSupport, createRipple } from "@/lib/panoramaUtils";
-import { SceneData, ConfigData, SceneInfo as SceneInfoType, LinkHotspot } from "@/types/scenes";
+import { useState, useEffect, useRef, useCallback, MouseEvent } from 'react';
+import Script from 'next/script';
+import FloorSelector from './FloorSelector';
+import SceneInfo from './SceneInfo';
+import MiniMap from './MiniMap';
+import LoadingScreen from './LoadingScreen';
+import TransitionOverlay from './TransitionOverlay';
+import Hotspot from './Hotspot';
+import { checkWebGLSupport, createRipple } from '@/lib/panoramaUtils';
+import { ConfigData, SceneInfo as SceneInfoType, LinkHotspot } from '@/types/scenes';
 
 // Using types imported from @/types/scenes.ts
 
@@ -28,75 +28,58 @@ export default function PanoramaViewer() {
   const hotspotTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const marzipanoRef = useRef<boolean>(false);
 
-  // Initialize viewer
-  const initializeViewer = useCallback(async () => {
+  // Clear hotspots for a scene
+  const clearHotspotsForScene = useCallback((sceneInfo: SceneInfoType): void => {
+    if (!sceneInfo.scene) return;
+
     try {
-      // Check WebGL support
-      if (!checkWebGLSupport()) {
-        throw new Error("WebGL is not supported or disabled in your browser");
-      }
+      const hotspotContainer = sceneInfo.scene.hotspotContainer();
 
-      // Load configuration
-      const response = await fetch("/config.json");
-      if (!response.ok) {
-        throw new Error(`Failed to load config.json: ${response.statusText}`);
-      }
-
-      const configData = await response.json() as ConfigData;
-      setConfig(configData);
-
-      // Initialize Marzipano viewer
-      const Marzipano = (window as any).Marzipano;
-      if (!Marzipano) {
-        throw new Error("Marzipano library not loaded");
-      }
-
-      const viewerOpts = {
-        controls: {
-          mouseViewMode: "drag",
-        },
-        stage: {
-          progressive: true,
-        },
-      };
-
-      if (!panoRef.current) {
-        throw new Error("Panorama container not found");
-      }
-
-      const viewer = new Marzipano.Viewer(panoRef.current, viewerOpts);
-      viewerRef.current = viewer;
-
-      // Initialize scenes object (but don't create them yet)
-      configData.scenes.forEach((sceneData) => {
-        scenesRef.current[sceneData.id] = {
-          data: sceneData,
-          scene: null,
-          hotspotElements: [],
-          loaded: false,
-        };
+      // Destroy all hotspots
+      const hotspots = hotspotContainer.listHotspots();
+      hotspots.forEach((hotspot: any) => {
+        hotspotContainer.destroyHotspot(hotspot);
       });
 
-      // Load and display first scene
-      if (configData.scenes.length > 0) {
-        await loadScene(configData.scenes[0].id);
-        switchScene(configData.scenes[0].id, true);
-      }
-
-      setIsLoading(false);
-
-      // Show tap hint after a delay
-      setTimeout(() => setShowTapHint(true), 1000);
-      setTimeout(() => setShowTapHint(false), 4000);
+      // Clear our references
+      sceneInfo.hotspotElements = [];
     } catch (err) {
-      console.error("Initialization error:", err);
-      setError(err instanceof Error ? err.message : String(err));
-      setIsLoading(false);
+      // Ignore errors during cleanup
+      sceneInfo.hotspotElements = [];
     }
   }, []);
 
+  // Create hotspots for a scene
+  const createHotspotsForScene = useCallback(
+    (sceneInfo: SceneInfoType): void => {
+      if (!sceneInfo.scene) return;
+
+      try {
+        const hotspotContainer = sceneInfo.scene.hotspotContainer();
+
+        // Clear any existing hotspots first
+        clearHotspotsForScene(sceneInfo);
+
+        // Create new hotspots
+        sceneInfo.data.linkHotspots.forEach((hotspotData: LinkHotspot) => {
+          const element = document.createElement('div');
+
+          hotspotContainer.createHotspot(element, {
+            yaw: hotspotData.yaw,
+            pitch: hotspotData.pitch,
+          });
+
+          sceneInfo.hotspotElements.push(element);
+        });
+      } catch (err) {
+        console.error('Error creating hotspots:', err);
+      }
+    },
+    [clearHotspotsForScene]
+  );
+
   // Load a single scene on demand
-  const loadScene = async (sceneId: string): Promise<void> => {
+  const loadScene = useCallback(async (sceneId: string): Promise<void> => {
     const sceneInfo = scenesRef.current[sceneId];
     if (!sceneInfo || sceneInfo.loaded) return;
 
@@ -105,9 +88,7 @@ export default function PanoramaViewer() {
 
     try {
       // Create source
-      const source = Marzipano.ImageUrlSource.fromString(
-        `/images/${sceneInfo.data.id}-pano.jpg`
-      );
+      const source = Marzipano.ImageUrlSource.fromString(`/images/${sceneInfo.data.id}-pano.jpg`);
 
       // Create geometry with lower resolution for better performance
       const geometry = new Marzipano.EquirectGeometry([
@@ -118,14 +99,8 @@ export default function PanoramaViewer() {
       ]);
 
       // Create view with more conservative limits
-      const limiter = Marzipano.RectilinearView.limit.traditional(
-        2048,
-        (100 * Math.PI) / 180
-      );
-      const view = new Marzipano.RectilinearView(
-        sceneInfo.data.initialViewParameters,
-        limiter
-      );
+      const limiter = Marzipano.RectilinearView.limit.traditional(2048, (100 * Math.PI) / 180);
+      const view = new Marzipano.RectilinearView(sceneInfo.data.initialViewParameters, limiter);
 
       // Create scene
       const scene = viewer.createScene({
@@ -141,39 +116,35 @@ export default function PanoramaViewer() {
     } catch (err) {
       console.error(`Failed to load scene ${sceneId}:`, err);
     }
-  };
+  }, []);
 
   // Preload adjacent scenes
-  const preloadAdjacentScenes = async (sceneId: string): Promise<void> => {
-    const sceneInfo = scenesRef.current[sceneId];
-    if (!sceneInfo) return;
+  const preloadAdjacentScenes = useCallback(
+    async (sceneId: string): Promise<void> => {
+      const sceneInfo = scenesRef.current[sceneId];
+      if (!sceneInfo) return;
 
-    // Get current loaded scene count
-    const loadedCount = Object.values(scenesRef.current).filter(
-      (s) => s.loaded
-    ).length;
+      // Get current loaded scene count
+      const loadedCount = Object.values(scenesRef.current).filter(s => s.loaded).length;
 
-    // Only preload if we haven't loaded too many scenes
-    if (loadedCount < 10) {
-      // Preload connected scenes
-      const connections = sceneInfo.data.linkHotspots
-        .map((h) => h.target)
-        .slice(0, 2); // Only preload first 2 connections
+      // Only preload if we haven't loaded too many scenes
+      if (loadedCount < 10) {
+        // Preload connected scenes
+        const connections = sceneInfo.data.linkHotspots.map(h => h.target).slice(0, 2); // Only preload first 2 connections
 
-      for (const targetId of connections) {
-        if (
-          scenesRef.current[targetId] &&
-          !scenesRef.current[targetId].loaded
-        ) {
-          try {
-            await loadScene(targetId);
-          } catch (err) {
-            console.error(`Failed to preload scene ${targetId}:`, err);
+        for (const targetId of connections) {
+          if (scenesRef.current[targetId] && !scenesRef.current[targetId].loaded) {
+            try {
+              await loadScene(targetId);
+            } catch (err) {
+              console.error(`Failed to preload scene ${targetId}:`, err);
+            }
           }
         }
       }
-    }
-  };
+    },
+    [loadScene]
+  );
 
   // Switch scene
   const switchScene = useCallback(
@@ -207,68 +178,88 @@ export default function PanoramaViewer() {
 
       // Preload adjacent scenes in background
       setTimeout(() => {
-        preloadAdjacentScenes(sceneId).catch((err) => {
-          console.error("Error preloading adjacent scenes:", err);
+        preloadAdjacentScenes(sceneId).catch(err => {
+          console.error('Error preloading adjacent scenes:', err);
         });
       }, 1000);
     },
-    [currentScene]
+    [currentScene, loadScene, clearHotspotsForScene, createHotspotsForScene, preloadAdjacentScenes]
   );
 
-  // Clear hotspots for a scene
-  const clearHotspotsForScene = (sceneInfo: SceneInfoType): void => {
-    if (!sceneInfo.scene) return;
-
+  // Initialize viewer
+  const initializeViewer = useCallback(async () => {
     try {
-      const hotspotContainer = sceneInfo.scene.hotspotContainer();
+      // Check WebGL support
+      if (!checkWebGLSupport()) {
+        throw new Error('WebGL is not supported or disabled in your browser');
+      }
 
-      // Destroy all hotspots
-      const hotspots = hotspotContainer.listHotspots();
-      hotspots.forEach((hotspot: any) => {
-        hotspotContainer.destroyHotspot(hotspot);
+      // Load configuration
+      const response = await fetch('/config.json');
+      if (!response.ok) {
+        throw new Error(`Failed to load config.json: ${response.statusText}`);
+      }
+
+      const configData = (await response.json()) as ConfigData;
+      setConfig(configData);
+
+      // Initialize Marzipano viewer
+      const Marzipano = (window as any).Marzipano;
+      if (!Marzipano) {
+        throw new Error('Marzipano library not loaded');
+      }
+
+      const viewerOpts = {
+        controls: {
+          mouseViewMode: 'drag',
+        },
+        stage: {
+          progressive: true,
+        },
+      };
+
+      if (!panoRef.current) {
+        throw new Error('Panorama container not found');
+      }
+
+      const viewer = new Marzipano.Viewer(panoRef.current, viewerOpts);
+      viewerRef.current = viewer;
+
+      // Initialize scenes object (but don't create them yet)
+      configData.scenes.forEach(sceneData => {
+        scenesRef.current[sceneData.id] = {
+          data: sceneData,
+          scene: null,
+          hotspotElements: [],
+          loaded: false,
+        };
       });
 
-      // Clear our references
-      sceneInfo.hotspotElements = [];
+      // Load and display first scene
+      if (configData.scenes.length > 0) {
+        await loadScene(configData.scenes[0].id);
+        switchScene(configData.scenes[0].id, true);
+      }
+
+      setIsLoading(false);
+
+      // Show tap hint after a delay
+      setTimeout(() => setShowTapHint(true), 1000);
+      setTimeout(() => setShowTapHint(false), 4000);
     } catch (err) {
-      // Ignore errors during cleanup
-      sceneInfo.hotspotElements = [];
+      console.error('Initialization error:', err);
+      setError(err instanceof Error ? err.message : String(err));
+      setIsLoading(false);
     }
-  };
-
-  // Create hotspots for a scene
-  const createHotspotsForScene = (sceneInfo: SceneInfoType): void => {
-    if (!sceneInfo.scene) return;
-
-    try {
-      const hotspotContainer = sceneInfo.scene.hotspotContainer();
-
-      // Clear any existing hotspots first
-      clearHotspotsForScene(sceneInfo);
-
-      // Create new hotspots
-      sceneInfo.data.linkHotspots.forEach((hotspotData: LinkHotspot) => {
-        const element = document.createElement("div");
-
-        hotspotContainer.createHotspot(element, {
-          yaw: hotspotData.yaw,
-          pitch: hotspotData.pitch,
-        });
-
-        sceneInfo.hotspotElements.push(element);
-      });
-    } catch (err) {
-      console.error("Error creating hotspots:", err);
-    }
-  };
+  }, [loadScene, switchScene]);
 
   // Navigate to scene
   const navigateToScene = useCallback(
     (sceneId: string): void => {
       setTransitioning(true);
       setTimeout(() => {
-        switchScene(sceneId).catch((err) => {
-          console.error("Error switching scene:", err);
+        switchScene(sceneId).catch(err => {
+          console.error('Error switching scene:', err);
         });
         setTimeout(() => setTransitioning(false), 100);
       }, 300);
@@ -299,7 +290,7 @@ export default function PanoramaViewer() {
   const handlePanoClick = useCallback(
     (e: MouseEvent<HTMLDivElement>): void => {
       // Don't toggle if clicking a hotspot
-      if ((e.target as HTMLElement).closest(".hotspot")) return;
+      if ((e.target as HTMLElement).closest('.hotspot')) return;
 
       // Show touch ripple effect
       createRipple(e.clientX, e.clientY);
@@ -313,14 +304,14 @@ export default function PanoramaViewer() {
   // Handle keyboard controls
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent): void => {
-      if (e.key === " ") {
+      if (e.key === ' ') {
         e.preventDefault();
         toggleHotspots();
       }
     };
 
-    document.addEventListener("keydown", handleKeyPress);
-    return () => document.removeEventListener("keydown", handleKeyPress);
+    document.addEventListener('keydown', handleKeyPress);
+    return () => document.removeEventListener('keydown', handleKeyPress);
   }, [toggleHotspots]);
 
   // Initialize when Marzipano loads
@@ -331,9 +322,12 @@ export default function PanoramaViewer() {
 
   // Cleanup on unmount
   useEffect(() => {
+    // Store reference to scenes for cleanup function
+    const scenes = scenesRef.current;
+
     return () => {
       // Clear all hotspots
-      Object.values(scenesRef.current).forEach((sceneInfo) => {
+      Object.values(scenes).forEach(sceneInfo => {
         if (sceneInfo.scene) {
           clearHotspotsForScene(sceneInfo);
         }
@@ -341,7 +335,7 @@ export default function PanoramaViewer() {
 
       // Don't destroy viewer or scenes - let browser handle cleanup
     };
-  }, []);
+  }, [clearHotspotsForScene]);
 
   if (error) {
     return <LoadingScreen error={error} />;
@@ -349,11 +343,7 @@ export default function PanoramaViewer() {
 
   return (
     <>
-      <Script
-        src="/js/marzipano.js"
-        strategy="afterInteractive"
-        onLoad={handleMarzipanoLoad}
-      />
+      <Script src="/js/marzipano.js" strategy="afterInteractive" onLoad={handleMarzipanoLoad} />
 
       {isLoading && <LoadingScreen />}
 
@@ -361,21 +351,19 @@ export default function PanoramaViewer() {
         ref={panoRef}
         id="pano"
         style={{
-          position: "absolute",
-          width: "100%",
-          height: "100%",
-          cursor: "grab",
+          position: 'absolute',
+          width: '100%',
+          height: '100%',
+          cursor: 'grab',
         }}
         onClick={handlePanoClick}
-        onMouseDown={(e) => ((e.currentTarget as HTMLElement).style.cursor = "grabbing")}
-        onMouseUp={(e) => ((e.currentTarget as HTMLElement).style.cursor = "grab")}
+        onMouseDown={e => ((e.currentTarget as HTMLElement).style.cursor = 'grabbing')}
+        onMouseUp={e => ((e.currentTarget as HTMLElement).style.cursor = 'grab')}
       />
 
       <TransitionOverlay active={transitioning} />
 
-      {showTapHint && (
-        <div className="tap-hint show">Tap anywhere to show navigation</div>
-      )}
+      {showTapHint && <div className="tap-hint show">Tap anywhere to show navigation</div>}
 
       {config && currentScene && scenesRef.current[currentScene] && (
         <>
@@ -387,9 +375,7 @@ export default function PanoramaViewer() {
 
           <SceneInfo
             scene={scenesRef.current[currentScene]?.data}
-            connections={
-              scenesRef.current[currentScene]?.data.linkHotspots.length || 0
-            }
+            connections={scenesRef.current[currentScene]?.data.linkHotspots.length || 0}
           />
 
           <MiniMap
@@ -399,23 +385,20 @@ export default function PanoramaViewer() {
           />
 
           {/* Render hotspots */}
-          {scenesRef.current[currentScene]?.hotspotElements?.map(
-            (element, index) => {
-              const hotspotData =
-                scenesRef.current[currentScene]?.data?.linkHotspots[index];
-              if (!hotspotData) return null;
+          {scenesRef.current[currentScene]?.hotspotElements?.map((element, index) => {
+            const hotspotData = scenesRef.current[currentScene]?.data?.linkHotspots[index];
+            if (!hotspotData) return null;
 
-              return (
-                <Hotspot
-                  key={`${currentScene}-${index}-${hotspotData.target}`}
-                  element={element}
-                  data={hotspotData}
-                  visible={hotspotsVisible}
-                  onNavigate={navigateToScene}
-                />
-              );
-            }
-          )}
+            return (
+              <Hotspot
+                key={`${currentScene}-${index}-${hotspotData.target}`}
+                element={element}
+                data={hotspotData}
+                visible={hotspotsVisible}
+                onNavigate={navigateToScene}
+              />
+            );
+          })}
         </>
       )}
 
