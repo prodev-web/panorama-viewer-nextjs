@@ -1,4 +1,5 @@
 import './globals.css'
+import { ReactNode } from 'react'
 
 export const metadata = {
   title: 'Advanced Panorama Viewer',
@@ -6,7 +7,11 @@ export const metadata = {
   viewport: 'width=device-width, initial-scale=1.0',
 }
 
-export default function RootLayout({ children }) {
+interface RootLayoutProps {
+  children: ReactNode
+}
+
+export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en">
       <head>

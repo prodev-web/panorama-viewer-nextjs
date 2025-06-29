@@ -1,8 +1,13 @@
 'use client'
 
+import { ReactElement } from 'react'
 import styles from './LoadingScreen.module.css'
 
-export default function LoadingScreen({ error }) {
+interface LoadingScreenProps {
+  error?: string | null
+}
+
+export default function LoadingScreen({ error }: LoadingScreenProps): ReactElement {
   if (error) {
     return (
       <div className={styles.container}>

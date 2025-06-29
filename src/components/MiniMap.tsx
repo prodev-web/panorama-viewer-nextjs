@@ -1,16 +1,53 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, ReactElement } from 'react'
 import styles from './MiniMap.module.css'
 
-export default function MiniMap({ scenes, currentScene, viewer }) {
-  const canvasRef = useRef(null)
+interface Position {
+  x: number
+  y: number
+  z: number
+}
+
+interface LinkHotspot {
+  target: string
+  yaw: number
+  pitch: number
+  distance?: number
+}
+
+interface SceneData {
+  id: string
+  name: string
+  floor: number
+  position: Position
+  linkHotspots: LinkHotspot[]
+  initialViewParameters?: {
+    yaw: number
+    pitch: number
+    fov: number
+  }
+  panoPos?: {
+    x: number
+    y: number
+  }
+}
+
+interface MiniMapProps {
+  scenes: SceneData[]
+  currentScene: SceneData | null
+  viewer: any // Marzipano viewer instance
+}
+
+export default function MiniMap({ scenes, currentScene, viewer }: MiniMapProps): ReactElement {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
   useEffect(() => {
     if (!currentScene || !canvasRef.current) return
 
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
+    if (!ctx) return
 
     // Set canvas size
     canvas.width = 180
@@ -110,6 +147,7 @@ export default function MiniMap({ scenes, currentScene, viewer }) {
       }
     } catch (e) {
       // Handle case where view might not be ready
+      return undefined
     }
   }, [viewer, currentScene])
 

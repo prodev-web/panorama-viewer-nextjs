@@ -1,18 +1,55 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, ReactElement } from 'react'
 import styles from './FloorSelector.module.css'
 
-export default function FloorSelector({ scenes, currentScene, onFloorChange }) {
-  const [floors, setFloors] = useState([])
+interface Position {
+  x: number
+  y: number
+  z: number
+}
+
+interface SceneData {
+  id: string
+  name: string
+  floor: number
+  position: Position
+  initialViewParameters?: {
+    yaw: number
+    pitch: number
+    fov: number
+  }
+  linkHotspots?: Array<{
+    yaw: number
+    pitch: number
+    target: string
+    distance?: number
+  }>
+  panoPos?: {
+    x: number
+    y: number
+  }
+}
+
+interface FloorSelectorProps {
+  scenes: SceneData[]
+  currentScene: SceneData | null
+  onFloorChange: (sceneId: string) => void
+}
+
+export default function FloorSelector({ scenes, currentScene, onFloorChange }: FloorSelectorProps): ReactElement {
+  const [floors, setFloors] = useState<number[]>([])
 
   useEffect(() => {
     // Get unique floors
-    const uniqueFloors = [...new Set(scenes.map(s => s.floor))].sort((a, b) => a - b)
+    const floorValues = scenes.map(s => s.floor)
+    const uniqueFloors = floorValues.filter((value, index, self) => {
+      return self.indexOf(value) === index
+    }).sort((a, b) => a - b)
     setFloors(uniqueFloors)
   }, [scenes])
 
-  const handleFloorClick = useCallback((floor) => {
+  const handleFloorClick = useCallback((floor: number) => {
     const floorScenes = scenes.filter((s) => s.floor === floor)
     if (floorScenes.length === 0) return
 
@@ -40,13 +77,13 @@ export default function FloorSelector({ scenes, currentScene, onFloorChange }) {
     onFloorChange(closestScene.id)
   }, [scenes, currentScene, onFloorChange])
 
-  const getFloorLabel = (floor) => {
+  const getFloorLabel = (floor: number): string => {
     if (floor === 0) return 'Ground'
     if (floor > 0) return `Level ${floor}`
     return `Basement ${Math.abs(floor)}`
   }
 
-  const getSceneCount = (floor) => {
+  const getSceneCount = (floor: number): number => {
     return scenes.filter(s => s.floor === floor).length
   }
 

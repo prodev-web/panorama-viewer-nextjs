@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, MouseEvent } from "react";
 import Script from "next/script";
 import FloorSelector from "./FloorSelector";
 import SceneInfo from "./SceneInfo";
@@ -10,20 +10,58 @@ import TransitionOverlay from "./TransitionOverlay";
 import Hotspot from "./Hotspot";
 import { checkWebGLSupport, createRipple } from "@/lib/panoramaUtils";
 
-export default function PanoramaViewer() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [config, setConfig] = useState(null);
-  const [currentScene, setCurrentScene] = useState(null);
-  const [hotspotsVisible, setHotspotsVisible] = useState(false);
-  const [transitioning, setTransitioning] = useState(false);
-  const [showTapHint, setShowTapHint] = useState(false);
+// Define types for our application
+interface SceneData {
+  id: string;
+  name: string;
+  floor: number;
+  initialViewParameters: {
+    yaw: number;
+    pitch: number;
+    fov: number;
+  };
+  linkHotspots: Array<{
+    yaw: number;
+    pitch: number;
+    target: string;
+    distance?: number;
+  }>;
+  position: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  panoPos?: {
+    x: number;
+    y: number;
+  };
+}
 
-  const viewerRef = useRef(null);
-  const scenesRef = useRef({});
-  const panoRef = useRef(null);
-  const hotspotTimeoutRef = useRef(null);
-  const marzipanoRef = useRef(null);
+interface ConfigData {
+  scenes: SceneData[];
+}
+
+interface SceneInfo {
+  data: SceneData;
+  scene: any; // Marzipano scene object
+  hotspotElements: HTMLElement[];
+  loaded: boolean;
+}
+
+export default function PanoramaViewer() {
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [config, setConfig] = useState<ConfigData | null>(null);
+  const [currentScene, setCurrentScene] = useState<string | null>(null);
+  const [hotspotsVisible, setHotspotsVisible] = useState<boolean>(false);
+  const [transitioning, setTransitioning] = useState<boolean>(false);
+  const [showTapHint, setShowTapHint] = useState<boolean>(false);
+
+  const viewerRef = useRef<any>(null);
+  const scenesRef = useRef<Record<string, SceneInfo>>({});
+  const panoRef = useRef<HTMLDivElement>(null);
+  const hotspotTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const marzipanoRef = useRef<boolean>(false);
 
   // Initialize viewer
   const initializeViewer = useCallback(async () => {
@@ -39,11 +77,11 @@ export default function PanoramaViewer() {
         throw new Error(`Failed to load config.json: ${response.statusText}`);
       }
 
-      const configData = await response.json();
+      const configData = await response.json() as ConfigData;
       setConfig(configData);
 
       // Initialize Marzipano viewer
-      const Marzipano = window.Marzipano;
+      const Marzipano = (window as any).Marzipano;
       if (!Marzipano) {
         throw new Error("Marzipano library not loaded");
       }
@@ -56,6 +94,10 @@ export default function PanoramaViewer() {
           progressive: true,
         },
       };
+
+      if (!panoRef.current) {
+        throw new Error("Panorama container not found");
+      }
 
       const viewer = new Marzipano.Viewer(panoRef.current, viewerOpts);
       viewerRef.current = viewer;
@@ -83,18 +125,18 @@ export default function PanoramaViewer() {
       setTimeout(() => setShowTapHint(false), 4000);
     } catch (err) {
       console.error("Initialization error:", err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : String(err));
       setIsLoading(false);
     }
   }, []);
 
   // Load a single scene on demand
-  const loadScene = async (sceneId) => {
+  const loadScene = async (sceneId: string): Promise<void> => {
     const sceneInfo = scenesRef.current[sceneId];
     if (!sceneInfo || sceneInfo.loaded) return;
 
     const viewer = viewerRef.current;
-    const Marzipano = window.Marzipano;
+    const Marzipano = (window as any).Marzipano;
 
     try {
       // Create source
@@ -137,7 +179,7 @@ export default function PanoramaViewer() {
   };
 
   // Preload adjacent scenes
-  const preloadAdjacentScenes = async (sceneId) => {
+  const preloadAdjacentScenes = async (sceneId: string): Promise<void> => {
     const sceneInfo = scenesRef.current[sceneId];
     if (!sceneInfo) return;
 
@@ -170,7 +212,7 @@ export default function PanoramaViewer() {
 
   // Switch scene
   const switchScene = useCallback(
-    async (sceneId, isInitial = false) => {
+    async (sceneId: string, isInitial: boolean = false): Promise<void> => {
       const sceneInfo = scenesRef.current[sceneId];
       if (!sceneInfo || !viewerRef.current) return;
 
@@ -209,7 +251,7 @@ export default function PanoramaViewer() {
   );
 
   // Clear hotspots for a scene
-  const clearHotspotsForScene = (sceneInfo) => {
+  const clearHotspotsForScene = (sceneInfo: SceneInfo): void => {
     if (!sceneInfo.scene) return;
 
     try {
@@ -217,7 +259,7 @@ export default function PanoramaViewer() {
 
       // Destroy all hotspots
       const hotspots = hotspotContainer.listHotspots();
-      hotspots.forEach((hotspot) => {
+      hotspots.forEach((hotspot: any) => {
         hotspotContainer.destroyHotspot(hotspot);
       });
 
@@ -230,7 +272,7 @@ export default function PanoramaViewer() {
   };
 
   // Create hotspots for a scene
-  const createHotspotsForScene = (sceneInfo) => {
+  const createHotspotsForScene = (sceneInfo: SceneInfo): void => {
     if (!sceneInfo.scene) return;
 
     try {
@@ -257,7 +299,7 @@ export default function PanoramaViewer() {
 
   // Navigate to scene
   const navigateToScene = useCallback(
-    (sceneId) => {
+    (sceneId: string): void => {
       setTransitioning(true);
       setTimeout(() => {
         switchScene(sceneId).catch((err) => {
@@ -270,14 +312,18 @@ export default function PanoramaViewer() {
   );
 
   // Toggle hotspots
-  const toggleHotspots = useCallback(() => {
+  const toggleHotspots = useCallback((): void => {
     if (hotspotsVisible) {
       setHotspotsVisible(false);
-      clearTimeout(hotspotTimeoutRef.current);
+      if (hotspotTimeoutRef.current) {
+        clearTimeout(hotspotTimeoutRef.current);
+      }
     } else {
       setHotspotsVisible(true);
       // Auto-hide after 5 seconds
-      clearTimeout(hotspotTimeoutRef.current);
+      if (hotspotTimeoutRef.current) {
+        clearTimeout(hotspotTimeoutRef.current);
+      }
       hotspotTimeoutRef.current = setTimeout(() => {
         setHotspotsVisible(false);
       }, 5000);
@@ -286,9 +332,9 @@ export default function PanoramaViewer() {
 
   // Handle panorama click
   const handlePanoClick = useCallback(
-    (e) => {
+    (e: MouseEvent<HTMLDivElement>): void => {
       // Don't toggle if clicking a hotspot
-      if (e.target.closest(".hotspot")) return;
+      if ((e.target as HTMLElement).closest(".hotspot")) return;
 
       // Show touch ripple effect
       createRipple(e.clientX, e.clientY);
@@ -301,7 +347,7 @@ export default function PanoramaViewer() {
 
   // Handle keyboard controls
   useEffect(() => {
-    const handleKeyPress = (e) => {
+    const handleKeyPress = (e: KeyboardEvent): void => {
       if (e.key === " ") {
         e.preventDefault();
         toggleHotspots();
@@ -313,7 +359,7 @@ export default function PanoramaViewer() {
   }, [toggleHotspots]);
 
   // Initialize when Marzipano loads
-  const handleMarzipanoLoad = () => {
+  const handleMarzipanoLoad = (): void => {
     marzipanoRef.current = true;
     initializeViewer();
   };
@@ -356,8 +402,8 @@ export default function PanoramaViewer() {
           cursor: "grab",
         }}
         onClick={handlePanoClick}
-        onMouseDown={(e) => (e.currentTarget.style.cursor = "grabbing")}
-        onMouseUp={(e) => (e.currentTarget.style.cursor = "grab")}
+        onMouseDown={(e) => ((e.currentTarget as HTMLElement).style.cursor = "grabbing")}
+        onMouseUp={(e) => ((e.currentTarget as HTMLElement).style.cursor = "grab")}
       />
 
       <TransitionOverlay active={transitioning} />

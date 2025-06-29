@@ -1,11 +1,25 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, Root } from "react-dom/client";
 import styles from "./Hotspot.module.css";
 
-export default function Hotspot({ element, data, visible, onNavigate }) {
-  const rootRef = useRef(null);
+interface HotspotData {
+  target: string;
+  distance?: number;
+  yaw: number;
+  pitch: number;
+}
+
+interface HotspotProps {
+  element: HTMLElement;
+  data: HotspotData;
+  visible: boolean;
+  onNavigate: (sceneId: string) => void;
+}
+
+export default function Hotspot({ element, data, visible, onNavigate }: HotspotProps) {
+  const rootRef = useRef<Root | null>(null);
 
   useEffect(() => {
     if (!element) return;
@@ -15,7 +29,7 @@ export default function Hotspot({ element, data, visible, onNavigate }) {
       rootRef.current = createRoot(element);
     }
 
-    const handleClick = (e) => {
+    const handleClick = (e: React.MouseEvent) => {
       e.stopPropagation();
       onNavigate(data.target);
     };

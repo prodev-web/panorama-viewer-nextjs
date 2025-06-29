@@ -1,8 +1,42 @@
 'use client'
 
+import { ReactElement } from 'react'
 import styles from './SceneInfo.module.css'
 
-export default function SceneInfo({ scene, connections }) {
+interface Position {
+  x: number
+  y: number
+  z: number
+}
+
+interface SceneData {
+  id: string
+  name: string
+  floor: number
+  position: Position
+  initialViewParameters?: {
+    yaw: number
+    pitch: number
+    fov: number
+  }
+  linkHotspots?: Array<{
+    yaw: number
+    pitch: number
+    target: string
+    distance?: number
+  }>
+  panoPos?: {
+    x: number
+    y: number
+  }
+}
+
+interface SceneInfoProps {
+  scene: SceneData | null
+  connections: number
+}
+
+export default function SceneInfo({ scene, connections }: SceneInfoProps): ReactElement | null {
   if (!scene) return null
 
   return (
