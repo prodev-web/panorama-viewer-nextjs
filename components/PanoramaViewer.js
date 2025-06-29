@@ -39,14 +39,7 @@ export default function PanoramaViewer() {
         throw new Error(`Failed to load config.json: ${response.statusText}`);
       }
 
-      const text = await response.text();
-      if (!text || text.trim() === "") {
-        throw new Error(
-          "config.json is empty. Please run: python3 scripts/generate_marzipano_config.py"
-        );
-      }
-
-      const configData = JSON.parse(text);
+      const configData = await response.json();
       setConfig(configData);
 
       // Initialize Marzipano viewer
@@ -67,11 +60,19 @@ export default function PanoramaViewer() {
       const viewer = new Marzipano.Viewer(panoRef.current, viewerOpts);
       viewerRef.current = viewer;
 
-      // Create scenes
-      await createScenes(configData, viewer, Marzipano);
+      // Initialize scenes object (but don't create them yet)
+      configData.scenes.forEach((sceneData) => {
+        scenesRef.current[sceneData.id] = {
+          data: sceneData,
+          scene: null,
+          hotspotElements: [],
+          loaded: false,
+        };
+      });
 
-      // Display first scene
+      // Load and display first scene
       if (configData.scenes.length > 0) {
+        await loadScene(configData.scenes[0].id);
         switchScene(configData.scenes[0].id, true);
       }
 
@@ -87,103 +88,171 @@ export default function PanoramaViewer() {
     }
   }, []);
 
-  // Create scenes
-  const createScenes = async (configData, viewer, Marzipano) => {
-    const scenes = {};
+  // Load a single scene on demand
+  const loadScene = async (sceneId) => {
+    const sceneInfo = scenesRef.current[sceneId];
+    if (!sceneInfo || sceneInfo.loaded) return;
 
-    for (const sceneData of configData.scenes) {
-      try {
-        // Create source
-        const source = Marzipano.ImageUrlSource.fromString(
-          `/images/${sceneData.id}-pano.jpg`
-        );
+    const viewer = viewerRef.current;
+    const Marzipano = window.Marzipano;
 
-        // Create geometry
-        const geometry = new Marzipano.EquirectGeometry([
-          { width: 1024 },
-          { width: 2048 },
-          { width: 4096 },
-        ]);
+    try {
+      // Create source
+      const source = Marzipano.ImageUrlSource.fromString(
+        `/images/${sceneInfo.data.id}-pano.jpg`
+      );
 
-        // Create view
-        const limiter = Marzipano.RectilinearView.limit.traditional(
-          2048,
-          (100 * Math.PI) / 180
-        );
-        const view = new Marzipano.RectilinearView(
-          sceneData.initialViewParameters,
-          limiter
-        );
+      // Create geometry with lower resolution for better performance
+      const geometry = new Marzipano.EquirectGeometry([
+        { width: 512 },
+        { width: 1024 },
+        { width: 2048 },
+        { width: 4096 },
+      ]);
 
-        // Create scene
-        const scene = viewer.createScene({
-          source: source,
-          geometry: geometry,
-          view: view,
-          pinFirstLevel: true,
-        });
+      // Create view with more conservative limits
+      const limiter = Marzipano.RectilinearView.limit.traditional(
+        2048,
+        (100 * Math.PI) / 180
+      );
+      const view = new Marzipano.RectilinearView(
+        sceneInfo.data.initialViewParameters,
+        limiter
+      );
 
-        // Store scene
-        scenes[sceneData.id] = {
-          scene: scene,
-          data: sceneData,
-          hotspotElements: [],
-        };
-      } catch (err) {
-        console.error("Config loading error:", err);
-        if (err.message.includes("config.json")) {
-          setError(
-            "Configuration file not found. Please run: python3 scripts/generate_marzipano_config.py"
-          );
-        } else {
-          setError(err.message);
+      // Create scene
+      const scene = viewer.createScene({
+        source: source,
+        geometry: geometry,
+        view: view,
+        pinFirstLevel: true,
+      });
+
+      // Update scene info
+      sceneInfo.scene = scene;
+      sceneInfo.loaded = true;
+    } catch (err) {
+      console.error(`Failed to load scene ${sceneId}:`, err);
+    }
+  };
+
+  // Preload adjacent scenes
+  const preloadAdjacentScenes = async (sceneId) => {
+    const sceneInfo = scenesRef.current[sceneId];
+    if (!sceneInfo) return;
+
+    // Get current loaded scene count
+    const loadedCount = Object.values(scenesRef.current).filter(
+      (s) => s.loaded
+    ).length;
+
+    // Only preload if we haven't loaded too many scenes
+    if (loadedCount < 10) {
+      // Preload connected scenes
+      const connections = sceneInfo.data.linkHotspots
+        .map((h) => h.target)
+        .slice(0, 2); // Only preload first 2 connections
+
+      for (const targetId of connections) {
+        if (
+          scenesRef.current[targetId] &&
+          !scenesRef.current[targetId].loaded
+        ) {
+          try {
+            await loadScene(targetId);
+          } catch (err) {
+            console.error(`Failed to preload scene ${targetId}:`, err);
+          }
         }
-        setIsLoading(false);
-        return;
       }
     }
-
-    scenesRef.current = scenes;
   };
 
   // Switch scene
-  const switchScene = useCallback((sceneId, isInitial = false) => {
-    const sceneInfo = scenesRef.current[sceneId];
-    if (!sceneInfo || !viewerRef.current) return;
+  const switchScene = useCallback(
+    async (sceneId, isInitial = false) => {
+      const sceneInfo = scenesRef.current[sceneId];
+      if (!sceneInfo || !viewerRef.current) return;
 
-    // Switch scene
-    sceneInfo.scene.switchTo();
-    setCurrentScene(sceneId);
+      // Load scene if not already loaded
+      if (!sceneInfo.loaded) {
+        await loadScene(sceneId);
+      }
 
-    // Create hotspots for this scene
-    createHotspotsForScene(sceneInfo);
+      if (!sceneInfo.scene) return;
 
-    // Hide hotspots initially if not initial load
-    if (!isInitial) {
-      setHotspotsVisible(false);
+      // Clear existing hotspots before switching
+      if (currentScene && scenesRef.current[currentScene]) {
+        clearHotspotsForScene(scenesRef.current[currentScene]);
+      }
+
+      // Switch scene
+      sceneInfo.scene.switchTo();
+      setCurrentScene(sceneId);
+
+      // Create hotspots for this scene
+      createHotspotsForScene(sceneInfo);
+
+      // Hide hotspots initially if not initial load
+      if (!isInitial) {
+        setHotspotsVisible(false);
+      }
+
+      // Preload adjacent scenes in background
+      setTimeout(() => {
+        preloadAdjacentScenes(sceneId).catch((err) => {
+          console.error("Error preloading adjacent scenes:", err);
+        });
+      }, 1000);
+    },
+    [currentScene]
+  );
+
+  // Clear hotspots for a scene
+  const clearHotspotsForScene = (sceneInfo) => {
+    if (!sceneInfo.scene) return;
+
+    try {
+      const hotspotContainer = sceneInfo.scene.hotspotContainer();
+
+      // Destroy all hotspots
+      const hotspots = hotspotContainer.listHotspots();
+      hotspots.forEach((hotspot) => {
+        hotspotContainer.destroyHotspot(hotspot);
+      });
+
+      // Clear our references
+      sceneInfo.hotspotElements = [];
+    } catch (err) {
+      // Ignore errors during cleanup
+      sceneInfo.hotspotElements = [];
     }
-  }, []);
+  };
 
   // Create hotspots for a scene
   const createHotspotsForScene = (sceneInfo) => {
-    // Clear existing hotspots
-    sceneInfo.hotspotElements.forEach((element) => {
-      element.remove();
-    });
-    sceneInfo.hotspotElements = [];
+    if (!sceneInfo.scene) return;
 
-    // Create new hotspots
-    sceneInfo.data.linkHotspots.forEach((hotspotData) => {
-      const element = document.createElement("div");
+    try {
       const hotspotContainer = sceneInfo.scene.hotspotContainer();
 
-      hotspotContainer.createHotspot(element, {
-        yaw: hotspotData.yaw,
-        pitch: hotspotData.pitch,
-      });
+      // Clear any existing hotspots first
+      clearHotspotsForScene(sceneInfo);
 
-      sceneInfo.hotspotElements.push(element);
-    });
+      // Create new hotspots
+      sceneInfo.data.linkHotspots.forEach((hotspotData) => {
+        const element = document.createElement("div");
+
+        hotspotContainer.createHotspot(element, {
+          yaw: hotspotData.yaw,
+          pitch: hotspotData.pitch,
+        });
+
+        sceneInfo.hotspotElements.push(element);
+      });
+    } catch (err) {
+      console.error("Error creating hotspots:", err);
+    }
   };
 
   // Navigate to scene
@@ -191,7 +260,9 @@ export default function PanoramaViewer() {
     (sceneId) => {
       setTransitioning(true);
       setTimeout(() => {
-        switchScene(sceneId);
+        switchScene(sceneId).catch((err) => {
+          console.error("Error switching scene:", err);
+        });
         setTimeout(() => setTransitioning(false), 100);
       }, 300);
     },
@@ -247,6 +318,20 @@ export default function PanoramaViewer() {
     initializeViewer();
   };
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Clear all hotspots
+      Object.values(scenesRef.current).forEach((sceneInfo) => {
+        if (sceneInfo.scene) {
+          clearHotspotsForScene(sceneInfo);
+        }
+      });
+
+      // Don't destroy viewer or scenes - let browser handle cleanup
+    };
+  }, []);
+
   if (error) {
     return <LoadingScreen error={error} />;
   }
@@ -281,7 +366,7 @@ export default function PanoramaViewer() {
         <div className="tap-hint show">Tap anywhere to show navigation</div>
       )}
 
-      {config && currentScene && (
+      {config && currentScene && scenesRef.current[currentScene] && (
         <>
           <FloorSelector
             scenes={config.scenes}
@@ -303,13 +388,15 @@ export default function PanoramaViewer() {
           />
 
           {/* Render hotspots */}
-          {scenesRef.current[currentScene]?.hotspotElements.map(
+          {scenesRef.current[currentScene]?.hotspotElements?.map(
             (element, index) => {
               const hotspotData =
-                scenesRef.current[currentScene].data.linkHotspots[index];
+                scenesRef.current[currentScene]?.data?.linkHotspots[index];
+              if (!hotspotData) return null;
+
               return (
                 <Hotspot
-                  key={`${currentScene}-${index}-${hotspotData.target}`} // More specific key
+                  key={`${currentScene}-${index}-${hotspotData.target}`}
                   element={element}
                   data={hotspotData}
                   visible={hotspotsVisible}
