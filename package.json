@@ -3,19 +3,19 @@
     "version": "1.0.0",
     "private": true,
     "scripts": {
-      "dev": "next dev",
-      "build": "NODE_OPTIONS='--max-old-space-size=4096' next build",
-      "start": "next start",
-      "lint": "next lint",
-      "generate-config": "python3 scripts/generate_marzipano_config.py && mv config.json public/"
+        "dev": "next dev",
+        "build": "NODE_OPTIONS='--max-old-space-size=4096' next build",
+        "start": "next start",
+        "lint": "next lint",
+        "generate-config": "(python scripts/generate_marzipano_config.py || python3 scripts/generate_marzipano_config.py) && (move config.json public/ || mv config.json public/)"
     },
     "dependencies": {
-      "next": "14.0.3",
-      "react": "^18",
-      "react-dom": "^18"
+        "next": "^14.2.30",
+        "react": "^18",
+        "react-dom": "^18"
     },
     "devDependencies": {
-      "eslint": "^8",
-      "eslint-config-next": "14.0.3"
+        "eslint": "^8",
+        "eslint-config-next": "14.0.3"
     }
-  }
+}
